@@ -135,19 +135,35 @@ decode_results results;  // Somewhere to store the results
 
 // WiFi
 
-
 // MQTT Broker
-const char *mqtt_broker = "192.168.3.64";//broker.mqttdashboard.com
+const char *mqtt_broker = "192.168.1.16";//broker.mqttdashboard.com
 const char *topicPub = "Test";
 const char *topicSub = "Test";
 const char *mqtt_username = "mqtt";
 const char *mqtt_password = "123456789";
 const int mqtt_port = 1883;
-char dataPub[]="";
-
+char dataPub[]="hello hello";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+void callback(char *topicSub, byte *payload, unsigned int length) {
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topicSub);
+  Serial.print("Message:");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char) payload[i]);
+  }
+}
+
+char* toCharArray(String str) {
+  return &str[0];
+}
+
+void publish(String buffer, const char* topic) {
+  client.publish(topic, toCharArray(buffer));
+}
+
 
 void setup() { 
 #if defined(ESP8266)
@@ -162,7 +178,7 @@ void setup() {
   assert(irutils::lowLevelSanityCheck() == 0);
 
   Serial.printf("\n" D_STR_IRRECVDUMP_STARTUP "\n", kRecvPin);
-  OTAinit();  // setup OTA handlers and show IP
+  
 #if DECODE_HASH
   // Ignore messages with less than minimum on or off pulses.
   irrecv.setUnknownThreshold(kMinUnknownSize);
@@ -172,6 +188,7 @@ void setup() {
 
   
   // connecting to a WiFi network
+  WiFi.mode(WIFI_STA);
   // AutoConnect to the last AP
   Serial.println("\nEnter setAutoConnect");
   WiFi.setAutoConnect(true);
@@ -184,6 +201,7 @@ void setup() {
   // if fail, enter Smartconfig
   if (!WiFi.isConnected()) {
     WiFi.beginSmartConfig();
+    Serial.println("");
     Serial.println("AutoConnecting failed");
     Serial.println("Enter smartconfig");
     while (WiFi.status() != WL_CONNECTED) {
@@ -224,42 +242,24 @@ void loop() {
   if (irrecv.decode(&results)) {
     // Display a crude timestamp.
     uint32_t now = millis();
-    Serial.printf(D_STR_TIMESTAMP " : %06u.%03u\n", now / 1000, now % 1000);
+//    Serial.printf(D_STR_TIMESTAMP " : %06u.%03u\n", now / 1000, now % 1000);
     // Check if we got an IR message that was to big for our capture buffer.
     if (results.overflow)
-      Serial.printf(D_WARN_BUFFERFULL "\n", kCaptureBufferSize);
+//      Serial.printf(D_WARN_BUFFERFULL "\n", kCaptureBufferSize);
     // Display the library version the message was captured with.
-    Serial.println(D_STR_LIBRARY "   : v" _IRREMOTEESP8266_VERSION_ "\n");
+//    Serial.println(D_STR_LIBRARY "   : v" _IRREMOTEESP8266_VERSION_ "\n");
     // Display the tolerance percentage if it has been change from the default.
     if (kTolerancePercentage != kTolerance)
       Serial.printf(D_STR_TOLERANCE " : %d%%\n", kTolerancePercentage);
     // Display the basic output of what we found.
-    Serial.println("1");
-    Serial.println("Display the basic output of what we found");
     Serial.print(resultToHumanReadableBasic(&results));
     // Display any extra A/C info if we have it.
-    Serial.println("2");
-    Serial.println("Display any extra A/C info if we have it");
     String description = IRAcUtils::resultAcToString(&results);
-//    char datapublish[] = IRAcUtils::resultAcToChar(&results);
     if (description.length())Serial.println(D_STR_MESGDESC ": " + description);
     yield();  // Feed the WDT as the text output can take a while to print.
-    description.toCharArray(dataPub, description.length()+1);
-    Serial.print("Send to MQTT broker:  ");
-    Serial.println(dataPub);
-    client.publish(topicPub, dataPub);
-    Serial.println();
-    yield();
-  }
-  
-  OTAloopHandler();
-}
+    String proto = getProtocol(&results);
+    publish(description, topicPub);
 
-void callback(char *topicSub, byte *payload, unsigned int length) {
-  Serial.print("Message arrived in topic: ");
-  Serial.println(topicSub);
-  Serial.print("Message:");
-  for (int i = 0; i < length; i++) {
-    Serial.print((char) payload[i]);
+
   }
 }
